@@ -1,5 +1,4 @@
 #include "Bfinders.c"
-#include <stdbool.h>
 #include <stdio.h>
 
 int main() {
@@ -70,6 +69,6 @@ int main() {
             }
         }
     }
-    
+
     return 0;
 }
