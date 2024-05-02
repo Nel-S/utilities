@@ -36,42 +36,42 @@ bool U_getFitnessBounded(const Pos *coord, const double *temperature, const doub
 	return !upperBound || *fitness < *upperBound;
 }
 
-double U_sampleAndGetFitness(const Pos *coord, PerlinNoise *oct) {
+double U_sampleAndGetFitness(const Pos *coord, PerlinNoise *oct, const bool largeBiomesFlag) {
 	double fitness = -INFINITY;
-	U_sampleAndGetFitnessBounded(coord, oct, NULL, &fitness);
+	U_sampleAndGetFitnessBounded(coord, oct, NULL, largeBiomesFlag, &fitness);
 	return fitness;
 }
 
-bool U_sampleAndGetFitnessBounded(const Pos *coord, PerlinNoise *oct, const double *upperBound, double *fitness) {
+bool U_sampleAndGetFitnessBounded(const Pos *coord, PerlinNoise *oct, const double *upperBound, const bool largeBiomesFlag, double *fitness) {
 	if (!coord) return false;
 	// Distance
 	uint64_t squaredEuclid = (uint64_t)coord->x * coord->x + (uint64_t)coord->z * coord->z;
 	*fitness = (squaredEuclid*squaredEuclid)/390625.;
 	if (upperBound && *fitness >= *upperBound) return false;
 	double px = coord->x, pz = coord->z;
-	U_sampleClimate(NP_SHIFT, oct, &px, &pz);
+	U_sampleClimate(NP_SHIFT, oct, &px, &pz, largeBiomesFlag);
 	// Continentalness
-	double sample = U_sampleClimate(NP_CONTINENTALNESS, oct, &px, &pz);
+	double sample = U_sampleClimate(NP_CONTINENTALNESS, oct, &px, &pz, largeBiomesFlag);
 	double offset = sample < 0 ? min(sample + 0.11, 0) : max(sample - 1, 0);
 	*fitness += 100000000*offset*offset;
 	if (upperBound && *fitness >= *upperBound) return false;
 	// Weirdness
-	sample = U_sampleClimate(NP_WEIRDNESS, oct, &px, &pz);
+	sample = U_sampleClimate(NP_WEIRDNESS, oct, &px, &pz, largeBiomesFlag);
 	offset = max(fabs(sample) < 0.16 ? 0.16 - fabs(sample) : fabs(sample) - 1, 0);
 	*fitness += 100000000*offset*offset;
 	if (upperBound && *fitness >= *upperBound) return false;
 	// Erosion
-	sample = U_sampleClimate(NP_EROSION, oct, &px, &pz);
+	sample = U_sampleClimate(NP_EROSION, oct, &px, &pz, largeBiomesFlag);
 	offset = max(fabs(sample) - 1, 0);
 	*fitness += 100000000*offset*offset;
 	if (upperBound && *fitness >= *upperBound) return false;
 	// Temperature
-	sample = U_sampleClimate(NP_TEMPERATURE, oct, &px, &pz);
+	sample = U_sampleClimate(NP_TEMPERATURE, oct, &px, &pz, largeBiomesFlag);
 	offset = max(fabs(sample) - 1, 0);
 	*fitness += 100000000*offset*offset;
 	if (upperBound && *fitness >= *upperBound) return false;
 	// Humidity
-	sample = U_sampleClimate(NP_HUMIDITY, oct, &px, &pz);
+	sample = U_sampleClimate(NP_HUMIDITY, oct, &px, &pz, largeBiomesFlag);
 	offset = max(fabs(sample) - 1, 0);
 	*fitness += 100000000*offset*offset;
 	return !upperBound || *fitness < *upperBound;
@@ -127,14 +127,14 @@ double U_getEffectiveWeirdnessInner(const double fitness) {
 // 	return true;
 // }
 
-bool U_firstStageSpawnBounded(PerlinNoise *oct, const double fitnessLowerBound, int *chosenCoordIndex, double *chosenFitness) {
+bool U_firstStageSpawnBounded(PerlinNoise *oct, const double fitnessLowerBound, int *chosenCoordIndex, double *chosenFitness, const bool largeBiomesFlag) {
 	double bestFitness = INFINITY;
 	// TODO: Continue as soon as an individual samplePerlin pushes fitness over fitness?
 	for (size_t i = 0; i < sizeof(U_SPAWN_FIRST_STAGE_VALS)/sizeof(*U_SPAWN_FIRST_STAGE_VALS); ++i) {
 		double fitness = U_SPAWN_FIRST_STAGE_VALS[i][U_spawn_table_fitness];
 		if (fitness >= bestFitness) continue;
 		Pos pos = {U_SPAWN_FIRST_STAGE_VALS[i][U_spawn_table_x], U_SPAWN_FIRST_STAGE_VALS[i][U_spawn_table_z]};
-		if (!U_sampleAndGetFitnessBounded(&pos, oct, &bestFitness, &fitness)) continue;
+		if (!U_sampleAndGetFitnessBounded(&pos, oct, &bestFitness, largeBiomesFlag, &fitness)) continue;
 		if (chosenCoordIndex) *chosenCoordIndex = i;
 		if (*chosenFitness) *chosenFitness = fitness;
 		bestFitness = fitness;
@@ -143,14 +143,14 @@ bool U_firstStageSpawnBounded(PerlinNoise *oct, const double fitnessLowerBound, 
 	return true;
 }
 
-bool U_secondStageSpawnBounded(PerlinNoise *oct, const int firstStageChosenCoordIndex, const double firstStageChosenFitness, const double fitnessLowerBound, int *chosenCoordIndex, double *chosenFitness) {
+bool U_secondStageSpawnBounded(PerlinNoise *oct, const int firstStageChosenCoordIndex, const double firstStageChosenFitness, const double fitnessLowerBound, int *chosenCoordIndex, const bool largeBiomesFlag, double *chosenFitness) {
 	double bestFitness = firstStageChosenFitness;
 	// TODO: Continue as soon as an individual samplePerlin pushes fitness over fitness?
 	for (size_t i = 0; i < sizeof(U_SPAWN_SECOND_STAGE_VALS[firstStageChosenCoordIndex])/sizeof(*U_SPAWN_SECOND_STAGE_VALS[firstStageChosenCoordIndex]); ++i) {
 		double fitness = U_SPAWN_SECOND_STAGE_VALS[firstStageChosenCoordIndex][i][U_spawn_table_fitness];
 		if (fitness >= bestFitness) continue;
 		Pos pos = {U_SPAWN_SECOND_STAGE_VALS[firstStageChosenCoordIndex][i][U_spawn_table_x], U_SPAWN_SECOND_STAGE_VALS[firstStageChosenCoordIndex][i][U_spawn_table_z]};
-		if (!U_sampleAndGetFitnessBounded(&pos, oct, &bestFitness, &fitness)) continue;
+		if (!U_sampleAndGetFitnessBounded(&pos, oct, &bestFitness, largeBiomesFlag, &fitness)) continue;
 		if (chosenCoordIndex) *chosenCoordIndex = i;
 		if (*chosenFitness) *chosenFitness = fitness;
 		bestFitness = fitness;
@@ -159,12 +159,12 @@ bool U_secondStageSpawnBounded(PerlinNoise *oct, const int firstStageChosenCoord
 	return true;
 }
 
-bool U_firstStageSpawnBounded_noTable(PerlinNoise *oct, const double fitnessLowerBound, Pos *chosenCoord, double *chosenFitness) {
+bool U_firstStageSpawnBounded_noTable(PerlinNoise *oct, const double fitnessLowerBound, Pos *chosenCoord, const bool largeBiomesFlag, double *chosenFitness) {
 	double fitness, bestFitness = INFINITY;
 	for (double rad = 0.; rad <= 2048.; rad += 512.) {
 		for (double ang = 0.; ang <= U_TWO_PI; ang += rad ? 512./rad : INFINITY) {
 			Pos pos = {sin(ang) * rad, cos(ang) * rad};
-			if (!U_sampleAndGetFitnessBounded(&pos, oct, &bestFitness, &fitness)) continue;
+			if (!U_sampleAndGetFitnessBounded(&pos, oct, &bestFitness, largeBiomesFlag, &fitness)) continue;
 			if (chosenCoord) {
 				chosenCoord->x = pos.x;
 				chosenCoord->z = pos.z;
@@ -177,12 +177,12 @@ bool U_firstStageSpawnBounded_noTable(PerlinNoise *oct, const double fitnessLowe
 	return true;
 }
 
-bool U_secondStageSpawnBounded_noTable(PerlinNoise *oct, const Pos *firstStageChosenCoord, const double firstStageChosenFitness, const double fitnessLowerBound, Pos *chosenCoord, double *chosenFitness) {
+bool U_secondStageSpawnBounded_noTable(PerlinNoise *oct, const Pos *firstStageChosenCoord, const double firstStageChosenFitness, const double fitnessLowerBound, Pos *chosenCoord, const bool largeBiomesFlag, double *chosenFitness) {
 	double fitness, bestFitness = firstStageChosenFitness;
 	for (double rad = 32.; rad <= 512.; rad += 32.) {
 		for (double ang = 0.; ang <= U_TWO_PI; ang += 32./rad) {
 			Pos pos = {firstStageChosenCoord->x + (int)(sin(ang) * rad), firstStageChosenCoord->z + (int)(cos(ang) * rad)};
-			if (!U_sampleAndGetFitnessBounded(&pos, oct, &bestFitness, &fitness)) continue;
+			if (!U_sampleAndGetFitnessBounded(&pos, oct, &bestFitness, largeBiomesFlag, &fitness)) continue;
 			if (chosenCoord) {
 				chosenCoord->x = pos.x;
 				chosenCoord->z = pos.z;

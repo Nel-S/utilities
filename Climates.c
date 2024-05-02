@@ -96,9 +96,9 @@ int U_initClimateBoundsArray(const int climate, const double desiredClimateSampl
 	return count;
 }
 
-void U_manualBNinit(BiomeNoise *biomeNoise) {
+void U_manualBNinit(BiomeNoise *biomeNoise, const bool largeBiomesFlag) {
     if (biomeNoise->mc < MC_1_18) return;
-	const int LB_MULT = 3*LARGE_BIOMES_FLAG + 1;
+	const int LB_MULT = 3*largeBiomesFlag + 1;
 
     biomeNoise->climate[NP_TEMPERATURE].amplitude = biomeNoise->climate[NP_SHIFT].amplitude = biomeNoise->climate[NP_WEIRDNESS].amplitude = 5./4;
 	biomeNoise->climate[NP_HUMIDITY].amplitude = 10./9;
@@ -192,30 +192,30 @@ void U_initPerlin(PerlinNoise *octave, Xoroshiro *xoroshiro) {
 	octave->t2 = d2*d2*d2 * (d2 * (d2*6. - 15.) + 10.);
 }
 
-void U_initClimate(const int climate, PerlinNoise *octaves, const uint64_t seed) {
+void U_initClimate(const int climate, PerlinNoise *octaves, const uint64_t seed, const bool largeBiomesFlag) {
 	double px = 0, pz = 0, climateSample;
-	U_initAndSampleClimateBounded(climate, octaves, &px, &pz, NULL, NULL, &seed, &climateSample);
+	U_initAndSampleClimateBounded(climate, octaves, &px, &pz, NULL, NULL, &seed, largeBiomesFlag, &climateSample);
 }
 
-void U_initAllClimates(PerlinNoise *octaves, const uint64_t seed) {
-	for (int climate = 0; climate < NP_MAX; ++climate) U_initClimate(climate, octaves, seed);
+void U_initAllClimates(PerlinNoise *octaves, const uint64_t seed, const bool largeBiomesFlag) {
+	for (int climate = 0; climate < NP_MAX; ++climate) U_initClimate(climate, octaves, seed, largeBiomesFlag);
 }
 
 // TODO: See if any way exists to specify `octaves` as `const` while preserving deferral to `U_initAndSampleClimateBounded`, or see if it doesn't make a difference performance-wise
-double U_sampleClimate(const int climate, PerlinNoise *octaves, double *px, double *pz) {
+double U_sampleClimate(const int climate, PerlinNoise *octaves, double *px, double *pz, const bool largeBiomesFlag) {
 	double climateSample;
-	U_initAndSampleClimateBounded(climate, octaves, px, pz, NULL, NULL, NULL, &climateSample);
+	U_initAndSampleClimateBounded(climate, octaves, px, pz, NULL, NULL, NULL, largeBiomesFlag, &climateSample);
 	return climateSample;
 }
 
 // TODO: See if any way exists to specify `octaves` as `const` while preserving deferral to `U_initAndSampleClimateBounded`, or see if it doesn't make a difference performance-wise
-int U_sampleClimateBounded(const int climate, PerlinNoise *octaves, double *px, double *pz, const double *lowerBounds, const double *upperBounds, double *climateSample) {
-	return U_initAndSampleClimateBounded(climate, octaves, px, pz, lowerBounds, upperBounds, NULL, climateSample);
+int U_sampleClimateBounded(const int climate, PerlinNoise *octaves, double *px, double *pz, const double *lowerBounds, const double *upperBounds, const bool largeBiomesFlag, double *climateSample) {
+	return U_initAndSampleClimateBounded(climate, octaves, px, pz, lowerBounds, upperBounds, NULL, largeBiomesFlag, climateSample);
 }
 
-int U_initAndSampleClimateBounded(const int climate, PerlinNoise *octaves, double *px, double *pz, const double *lowerBounds, const double *upperBounds, const uint64_t *seedIfInitializingClimate, double *climateSample) {
+int U_initAndSampleClimateBounded(const int climate, PerlinNoise *octaves, double *px, double *pz, const double *lowerBounds, const double *upperBounds, const uint64_t *seedIfInitializingClimate, const bool largeBiomesFlag, double *climateSample) {
 	if (!climateSample && climate != NP_SHIFT) return 0;
-	const int LB_MULT = 3*LARGE_BIOMES_FLAG + 1;
+	const int LB_MULT = 3*largeBiomesFlag + 1;
 	const double OFF = 337./331;
 
 	Xoroshiro pxr = {0, 0}, pxr2;
@@ -228,12 +228,12 @@ int U_initAndSampleClimateBounded(const int climate, PerlinNoise *octaves, doubl
 	switch (climate) {
 		case NP_TEMPERATURE:
 		if (seedIfInitializingClimate) {
-			pxr.lo = xloo ^ (LARGE_BIOMES_FLAG ? 0x944b0073edf549db : 0x5c7e6b29735f0d7f);
-            pxr.hi = xhio ^ (LARGE_BIOMES_FLAG ? 0x4ff44347e9d22b96 : 0xf7d86f1bbc734988); // md5 "minecraft:temperature_large" or "minecraft:temperature"
+			pxr.lo = xloo ^ (largeBiomesFlag ? 0x944b0073edf549db : 0x5c7e6b29735f0d7f);
+            pxr.hi = xhio ^ (largeBiomesFlag ? 0x4ff44347e9d22b96 : 0xf7d86f1bbc734988); // md5 "minecraft:temperature_large" or "minecraft:temperature"
             xlo = xNextLong(&pxr);
             xhi = xNextLong(&pxr);
-            pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0xb198de63a8012672 : 0x36d326eed40efeb2);
-            pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x7b84cad43ef7b5a8 : 0x5be9ce18223c636a); // md5 "octave_-12" or "octave_-10"
+            pxr2.lo = xlo ^ (largeBiomesFlag ? 0xb198de63a8012672 : 0x36d326eed40efeb2);
+            pxr2.hi = xhi ^ (largeBiomesFlag ? 0x7b84cad43ef7b5a8 : 0x5be9ce18223c636a); // md5 "octave_-12" or "octave_-10"
             U_initPerlin(&octaves[0], &pxr2);
 		}
 		*climateSample = 20./21 * samplePerlin(&octaves[0], *px/(1024*LB_MULT), 0, *pz/(1024*LB_MULT), 0, 0);
@@ -242,24 +242,24 @@ int U_initAndSampleClimateBounded(const int climate, PerlinNoise *octaves, doubl
 		if (seedIfInitializingClimate) {
 			xlo2 = xNextLong(&pxr);
             xhi2 = xNextLong(&pxr);
-            pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0xb198de63a8012672 : 0x36d326eed40efeb2);
-            pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x7b84cad43ef7b5a8 : 0x5be9ce18223c636a); // md5 "octave_-12" or "octave_-10"
+            pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0xb198de63a8012672 : 0x36d326eed40efeb2);
+            pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x7b84cad43ef7b5a8 : 0x5be9ce18223c636a); // md5 "octave_-12" or "octave_-10"
             U_initPerlin(&octaves[2], &pxr2);
 		}
 		*climateSample += 20./21 * samplePerlin(&octaves[2], *px/(1024*LB_MULT)*OFF, 0, *pz/(1024*LB_MULT)*OFF, 0, 0);
 		if ((lowerBounds && *climateSample < lowerBounds[1]) || (upperBounds && *climateSample > upperBounds[1])) return 1;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
-            pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
+            pxr2.hi = xhi ^ (largeBiomesFlag ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
             U_initPerlin(&octaves[1], &pxr2);
 		}
 		*climateSample += 10./63 * samplePerlin(&octaves[1], *px/(256*LB_MULT), 0, *pz/(256*LB_MULT), 0, 0);
 		if ((lowerBounds && *climateSample < lowerBounds[2]) || (upperBounds && *climateSample > upperBounds[2])) return 2;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
-            pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
+            pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
             U_initPerlin(&octaves[3], &pxr2);
 		}
 		*climateSample += 10./63 * samplePerlin(&octaves[3], *px/(256*LB_MULT)*OFF, 0, *pz/(256*LB_MULT)*OFF, 0, 0);
@@ -267,12 +267,12 @@ int U_initAndSampleClimateBounded(const int climate, PerlinNoise *octaves, doubl
 
 		case NP_HUMIDITY:
 		if (seedIfInitializingClimate) {
-			pxr.lo = xloo ^ (LARGE_BIOMES_FLAG ? 0x71b8ab943dbd5301 : 0x81bb4d22e8dc168e);
-            pxr.hi = xhio ^ (LARGE_BIOMES_FLAG ? 0xbb63ddcf39ff7a2b : 0xf1c8b4bea16303cd); // md5 "minecraft:vegetation_large" or "minecraft:vegetation"
+			pxr.lo = xloo ^ (largeBiomesFlag ? 0x71b8ab943dbd5301 : 0x81bb4d22e8dc168e);
+            pxr.hi = xhio ^ (largeBiomesFlag ? 0xbb63ddcf39ff7a2b : 0xf1c8b4bea16303cd); // md5 "minecraft:vegetation_large" or "minecraft:vegetation"
             xlo = xNextLong(&pxr);
             xhi = xNextLong(&pxr);
-            pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
-            pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
+            pxr2.lo = xlo ^ (largeBiomesFlag ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
+            pxr2.hi = xhi ^ (largeBiomesFlag ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
             U_initPerlin(&octaves[4], &pxr2);
 		}
 		*climateSample = 320./567 * samplePerlin(&octaves[4], *px/(256*LB_MULT), 0, *pz/(256*LB_MULT), 0, 0);
@@ -281,24 +281,24 @@ int U_initAndSampleClimateBounded(const int climate, PerlinNoise *octaves, doubl
 		if (seedIfInitializingClimate) {
 			xlo2 = xNextLong(&pxr);
             xhi2 = xNextLong(&pxr);
-            pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
-            pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
+            pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
+            pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
             U_initPerlin(&octaves[6], &pxr2);
 		}
 		*climateSample += 320./567 * samplePerlin(&octaves[6], *px/(256*LB_MULT)*OFF, 0, *pz/(256*LB_MULT)*OFF, 0, 0);
 		if ((lowerBounds && *climateSample < lowerBounds[1]) || (upperBounds && *climateSample > upperBounds[1])) return 1;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0x082fe255f8be6631 : 0xf11268128982754f);
-            pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x4e96119e22dedc81 : 0x257a1d670430b0aa); // md5 "octave_-9" or "octave_-7"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0x082fe255f8be6631 : 0xf11268128982754f);
+            pxr2.hi = xhi ^ (largeBiomesFlag ? 0x4e96119e22dedc81 : 0x257a1d670430b0aa); // md5 "octave_-9" or "octave_-7"
             U_initPerlin(&octaves[5], &pxr2);
 		}
 		*climateSample += 160./567 * samplePerlin(&octaves[5], *px/(128*LB_MULT), 0, *pz/(128*LB_MULT), 0, 0);
 		if ((lowerBounds && *climateSample < lowerBounds[2]) || (upperBounds && *climateSample > upperBounds[2])) return 2;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0x082fe255f8be6631 : 0xf11268128982754f);
-            pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x4e96119e22dedc81 : 0x257a1d670430b0aa); // md5 "octave_-9" or "octave_-7"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0x082fe255f8be6631 : 0xf11268128982754f);
+            pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x4e96119e22dedc81 : 0x257a1d670430b0aa); // md5 "octave_-9" or "octave_-7"
             U_initPerlin(&octaves[7], &pxr2);
 		}
 		*climateSample += 160./567 * samplePerlin(&octaves[7], *px/(128*LB_MULT)*OFF, 0, *pz/(128*LB_MULT)*OFF, 0, 0);
@@ -306,12 +306,12 @@ int U_initAndSampleClimateBounded(const int climate, PerlinNoise *octaves, doubl
 
 		case NP_CONTINENTALNESS:
 		if (seedIfInitializingClimate) {
-			pxr.lo = xloo ^ (LARGE_BIOMES_FLAG ? 0x9a3f51a113fce8dc : 0x83886c9d0ae3a662);
-			pxr.hi = xhio ^ (LARGE_BIOMES_FLAG ? 0xee2dbd157e5dcdad : 0xafa638a61b42e8ad); // md5 "minecraft:continentalness_large" or "minecraft:continentalness"
+			pxr.lo = xloo ^ (largeBiomesFlag ? 0x9a3f51a113fce8dc : 0x83886c9d0ae3a662);
+			pxr.hi = xhio ^ (largeBiomesFlag ? 0xee2dbd157e5dcdad : 0xafa638a61b42e8ad); // md5 "minecraft:continentalness_large" or "minecraft:continentalness"
 			xlo = xNextLong(&pxr);
 			xhi = xNextLong(&pxr);
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0x0fd787bfbc403ec3 : 0x082fe255f8be6631);
-			pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x74a4a31ca21b48b8 : 0x4e96119e22dedc81); // md5 "octave_-11" or "octave_-9"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0x0fd787bfbc403ec3 : 0x082fe255f8be6631);
+			pxr2.hi = xhi ^ (largeBiomesFlag ? 0x74a4a31ca21b48b8 : 0x4e96119e22dedc81); // md5 "octave_-11" or "octave_-9"
 			U_initPerlin(&octaves[8], &pxr2);
 		}
 		*climateSample = 384./511 * samplePerlin(&octaves[8], *px/(512*LB_MULT), 0, *pz/(512*LB_MULT), 0, 0);
@@ -320,136 +320,136 @@ int U_initAndSampleClimateBounded(const int climate, PerlinNoise *octaves, doubl
 		if (seedIfInitializingClimate) {
 			xlo2 = xNextLong(&pxr);
 			xhi2 = xNextLong(&pxr);
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0x0fd787bfbc403ec3 : 0x082fe255f8be6631);
-			pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x74a4a31ca21b48b8 : 0x4e96119e22dedc81); // md5 "octave_-11" or "octave_-9"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0x0fd787bfbc403ec3 : 0x082fe255f8be6631);
+			pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x74a4a31ca21b48b8 : 0x4e96119e22dedc81); // md5 "octave_-11" or "octave_-9"
 			U_initPerlin(&octaves[17], &pxr2);
 		}
 		*climateSample += 384./511 * samplePerlin(&octaves[17], *px/(512*LB_MULT)*OFF, 0, *pz/(512*LB_MULT)*OFF, 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[1]) || (upperBounds && *climateSample > upperBounds[1])) return 1;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
-			pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
+			pxr2.hi = xhi ^ (largeBiomesFlag ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
 			U_initPerlin(&octaves[9], &pxr2);
 		}
 		*climateSample += 192./511 * samplePerlin(&octaves[9], *px/(256*LB_MULT), 0, *pz/(256*LB_MULT), 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[2]) || (upperBounds && *climateSample > upperBounds[2])) return 2;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
-			pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
+			pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
 			U_initPerlin(&octaves[18], &pxr2);
 		}
 		*climateSample += 192./511 * samplePerlin(&octaves[18], *px/(256*LB_MULT)*OFF, 0, *pz/(256*LB_MULT)*OFF, 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[3]) || (upperBounds && *climateSample > upperBounds[3])) return 3;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0x082fe255f8be6631 : 0xf11268128982754f);
-			pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x4e96119e22dedc81 : 0x257a1d670430b0aa); // md5 "octave_-9" or "octave_-7"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0x082fe255f8be6631 : 0xf11268128982754f);
+			pxr2.hi = xhi ^ (largeBiomesFlag ? 0x4e96119e22dedc81 : 0x257a1d670430b0aa); // md5 "octave_-9" or "octave_-7"
 			U_initPerlin(&octaves[10], &pxr2);
 		}
 		*climateSample += 192./511 * samplePerlin(&octaves[10], *px/(128*LB_MULT), 0, *pz/(128*LB_MULT), 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[4]) || (upperBounds && *climateSample > upperBounds[4])) return 4;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0x082fe255f8be6631 : 0xf11268128982754f);
-			pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x4e96119e22dedc81 : 0x257a1d670430b0aa); // md5 "octave_-9" or "octave_-7"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0x082fe255f8be6631 : 0xf11268128982754f);
+			pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x4e96119e22dedc81 : 0x257a1d670430b0aa); // md5 "octave_-9" or "octave_-7"
 			U_initPerlin(&octaves[19], &pxr2);
 		}
 		*climateSample += 192./511 * samplePerlin(&octaves[19], *px/(128*LB_MULT)*OFF, 0, *pz/(128*LB_MULT)*OFF, 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[5]) || (upperBounds && *climateSample > upperBounds[5])) return 5;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0x0ef68ec68504005e : 0xe51c98ce7d1de664);
-			pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x48b6bf93a2789640 : 0x5f9478a733040c45); // md5 "octave_-8" or "octave_-6"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0x0ef68ec68504005e : 0xe51c98ce7d1de664);
+			pxr2.hi = xhi ^ (largeBiomesFlag ? 0x48b6bf93a2789640 : 0x5f9478a733040c45); // md5 "octave_-8" or "octave_-6"
 			U_initPerlin(&octaves[11], &pxr2);
 		}
 		*climateSample += 96./511 * samplePerlin(&octaves[11], *px/(64*LB_MULT), 0, *pz/(64*LB_MULT), 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[6]) || (upperBounds && *climateSample > upperBounds[6])) return 6;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0x0ef68ec68504005e : 0xe51c98ce7d1de664);
-			pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x48b6bf93a2789640 : 0x5f9478a733040c45); // md5 "octave_-8" or "octave_-6"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0x0ef68ec68504005e : 0xe51c98ce7d1de664);
+			pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x48b6bf93a2789640 : 0x5f9478a733040c45); // md5 "octave_-8" or "octave_-6"
 			U_initPerlin(&octaves[20], &pxr2);
 		}
 		*climateSample += 96./511 * samplePerlin(&octaves[20], *px/(64*LB_MULT)*OFF, 0, *pz/(64*LB_MULT)*OFF, 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[7]) || (upperBounds && *climateSample > upperBounds[7])) return 7;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0xf11268128982754f : 0x6d7b49e7e429850a);
-			pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x257a1d670430b0aa : 0x2e3063c622a24777); // md5 "octave_-7" or "octave_-5"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0xf11268128982754f : 0x6d7b49e7e429850a);
+			pxr2.hi = xhi ^ (largeBiomesFlag ? 0x257a1d670430b0aa : 0x2e3063c622a24777); // md5 "octave_-7" or "octave_-5"
 			U_initPerlin(&octaves[12], &pxr2);
 		}
 		*climateSample += 48./511 * samplePerlin(&octaves[12], *px/(32*LB_MULT), 0, *pz/(32*LB_MULT), 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[8]) || (upperBounds && *climateSample > upperBounds[8])) return 8;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0xf11268128982754f : 0x6d7b49e7e429850a);
-			pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x257a1d670430b0aa : 0x2e3063c622a24777); // md5 "octave_-7" or "octave_-5"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0xf11268128982754f : 0x6d7b49e7e429850a);
+			pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x257a1d670430b0aa : 0x2e3063c622a24777); // md5 "octave_-7" or "octave_-5"
 			U_initPerlin(&octaves[21], &pxr2);
 		}
 		*climateSample += 48./511 * samplePerlin(&octaves[21], *px/(32*LB_MULT)*OFF, 0, *pz/(32*LB_MULT)*OFF, 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[9]) || (upperBounds && *climateSample > upperBounds[9])) return 9;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0xe51c98ce7d1de664 : 0xbd90d5377ba1b762);
-			pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x5f9478a733040c45 : 0xc07317d419a7548d); // md5 "octave_-6" or "octave_-4"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0xe51c98ce7d1de664 : 0xbd90d5377ba1b762);
+			pxr2.hi = xhi ^ (largeBiomesFlag ? 0x5f9478a733040c45 : 0xc07317d419a7548d); // md5 "octave_-6" or "octave_-4"
 			U_initPerlin(&octaves[13], &pxr2);
 		}
 		*climateSample += 12./511 * samplePerlin(&octaves[13], *px/(16*LB_MULT), 0, *pz/(16*LB_MULT), 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[10]) || (upperBounds && *climateSample > upperBounds[10])) return 10;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0xe51c98ce7d1de664 : 0xbd90d5377ba1b762);
-			pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x5f9478a733040c45 : 0xc07317d419a7548d); // md5 "octave_-6" or "octave_-4"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0xe51c98ce7d1de664 : 0xbd90d5377ba1b762);
+			pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x5f9478a733040c45 : 0xc07317d419a7548d); // md5 "octave_-6" or "octave_-4"
 			U_initPerlin(&octaves[22], &pxr2);
 		}
 		*climateSample += 12./511 * samplePerlin(&octaves[22], *px/(16*LB_MULT)*OFF, 0, *pz/(16*LB_MULT)*OFF, 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[11]) || (upperBounds && *climateSample > upperBounds[11])) return 11;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0x6d7b49e7e429850a : 0x53d39c6752dac858);
-			pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x2e3063c622a24777 : 0xbcd1c5a80ab65b3e); // md5 "octave_-5" or "octave_-3"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0x6d7b49e7e429850a : 0x53d39c6752dac858);
+			pxr2.hi = xhi ^ (largeBiomesFlag ? 0x2e3063c622a24777 : 0xbcd1c5a80ab65b3e); // md5 "octave_-5" or "octave_-3"
 			U_initPerlin(&octaves[14], &pxr2);
 		}
 		*climateSample += 6./511 * samplePerlin(&octaves[14], *px/(8*LB_MULT), 0, *pz/(8*LB_MULT), 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[12]) || (upperBounds && *climateSample > upperBounds[12])) return 12;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0x6d7b49e7e429850a : 0x53d39c6752dac858);
-			pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x2e3063c622a24777 : 0xbcd1c5a80ab65b3e); // md5 "octave_-5" or "octave_-3"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0x6d7b49e7e429850a : 0x53d39c6752dac858);
+			pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x2e3063c622a24777 : 0xbcd1c5a80ab65b3e); // md5 "octave_-5" or "octave_-3"
 			U_initPerlin(&octaves[23], &pxr2);
 		}
 		*climateSample += 6./511 * samplePerlin(&octaves[23], *px/(8*LB_MULT)*OFF, 0, *pz/(8*LB_MULT)*OFF, 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[13]) || (upperBounds && *climateSample > upperBounds[13])) return 13;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0xbd90d5377ba1b762 : 0xb4a24d7a84e7677b);
-			pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0xc07317d419a7548d : 0x023ff9668e89b5c4); // md5 "octave_-4" or "octave_-2"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0xbd90d5377ba1b762 : 0xb4a24d7a84e7677b);
+			pxr2.hi = xhi ^ (largeBiomesFlag ? 0xc07317d419a7548d : 0x023ff9668e89b5c4); // md5 "octave_-4" or "octave_-2"
 			U_initPerlin(&octaves[15], &pxr2);
 		}
 		*climateSample += 3./511 * samplePerlin(&octaves[15], *px/(4*LB_MULT), 0, *pz/(4*LB_MULT), 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[14]) || (upperBounds && *climateSample > upperBounds[14])) return 14;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0xbd90d5377ba1b762 : 0xb4a24d7a84e7677b);
-			pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0xc07317d419a7548d : 0x023ff9668e89b5c4); // md5 "octave_-4" or "octave_-2"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0xbd90d5377ba1b762 : 0xb4a24d7a84e7677b);
+			pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0xc07317d419a7548d : 0x023ff9668e89b5c4); // md5 "octave_-4" or "octave_-2"
 			U_initPerlin(&octaves[24], &pxr2);
 		}
 		*climateSample += 3./511 * samplePerlin(&octaves[24], *px/(4*LB_MULT)*OFF, 0, *pz/(4*LB_MULT)*OFF, 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[15]) || (upperBounds && *climateSample > upperBounds[15])) return 15;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0x53d39c6752dac858 : 0xdffa22b534c5f608);
-			pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0xbcd1c5a80ab65b3e : 0xb9b67517d3665ca9); // md5 "octave_-3" or "octave_-1"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0x53d39c6752dac858 : 0xdffa22b534c5f608);
+			pxr2.hi = xhi ^ (largeBiomesFlag ? 0xbcd1c5a80ab65b3e : 0xb9b67517d3665ca9); // md5 "octave_-3" or "octave_-1"
 			U_initPerlin(&octaves[16], &pxr2);
 		}
 		*climateSample += 3./1022 * samplePerlin(&octaves[16], *px/(2*LB_MULT), 0, *pz/(2*LB_MULT), 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[16]) || (upperBounds && *climateSample > upperBounds[16])) return 16;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0x53d39c6752dac858 : 0xdffa22b534c5f608);
-			pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0xbcd1c5a80ab65b3e : 0xb9b67517d3665ca9); // md5 "octave_-3" or "octave_-1"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0x53d39c6752dac858 : 0xdffa22b534c5f608);
+			pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0xbcd1c5a80ab65b3e : 0xb9b67517d3665ca9); // md5 "octave_-3" or "octave_-1"
 			U_initPerlin(&octaves[25], &pxr2);
 		}
 		*climateSample += 3./1022 * samplePerlin(&octaves[25], *px/(2*LB_MULT)*OFF, 0, *pz/(2*LB_MULT)*OFF, 0, 0);
@@ -457,12 +457,12 @@ int U_initAndSampleClimateBounded(const int climate, PerlinNoise *octaves, doubl
 
 		case NP_EROSION:
 		if (seedIfInitializingClimate) {
-			pxr.lo = xloo ^ (LARGE_BIOMES_FLAG ? 0x8c984b1f8702a951 : 0xd02491e6058f6fd8);
-            pxr.hi = xhio ^ (LARGE_BIOMES_FLAG ? 0xead7b1f92bae535f : 0x4792512c94c17a80); // md5 "minecraft:erosion_large" or "minecraft:erosion"
+			pxr.lo = xloo ^ (largeBiomesFlag ? 0x8c984b1f8702a951 : 0xd02491e6058f6fd8);
+            pxr.hi = xhio ^ (largeBiomesFlag ? 0xead7b1f92bae535f : 0x4792512c94c17a80); // md5 "minecraft:erosion_large" or "minecraft:erosion"
             xlo = xNextLong(&pxr);
             xhi = xNextLong(&pxr);
-            pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0x0fd787bfbc403ec3 : 0x082fe255f8be6631);
-            pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x74a4a31ca21b48b8 : 0x4e96119e22dedc81); // md5 "octave_-11" or "octave_-9"
+            pxr2.lo = xlo ^ (largeBiomesFlag ? 0x0fd787bfbc403ec3 : 0x082fe255f8be6631);
+            pxr2.hi = xhi ^ (largeBiomesFlag ? 0x74a4a31ca21b48b8 : 0x4e96119e22dedc81); // md5 "octave_-11" or "octave_-9"
             U_initPerlin(&octaves[26], &pxr2);
 		}
 		*climateSample = 200./279 * samplePerlin(&octaves[26], *px/(512*LB_MULT), 0, *pz/(512*LB_MULT), 0, 0);
@@ -471,56 +471,56 @@ int U_initAndSampleClimateBounded(const int climate, PerlinNoise *octaves, doubl
 		if (seedIfInitializingClimate) {
 			xlo2 = xNextLong(&pxr);
             xhi2 = xNextLong(&pxr);
-            pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0x0fd787bfbc403ec3 : 0x082fe255f8be6631);
-            pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x74a4a31ca21b48b8 : 0x4e96119e22dedc81); // md5 "octave_-11" or "octave_-9"
+            pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0x0fd787bfbc403ec3 : 0x082fe255f8be6631);
+            pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x74a4a31ca21b48b8 : 0x4e96119e22dedc81); // md5 "octave_-11" or "octave_-9"
             U_initPerlin(&octaves[30], &pxr2);
 		}
 		*climateSample += 200./279 * samplePerlin(&octaves[30], *px/(512*LB_MULT)*OFF, 0, *pz/(512*LB_MULT)*OFF, 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[1]) || (upperBounds && *climateSample > upperBounds[1])) return 1;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
-            pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
+            pxr2.hi = xhi ^ (largeBiomesFlag ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
             U_initPerlin(&octaves[27], &pxr2);
 		}
 		*climateSample += 100./279 * samplePerlin(&octaves[27], *px/(256*LB_MULT), 0, *pz/(256*LB_MULT), 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[2]) || (upperBounds && *climateSample > upperBounds[2])) return 2;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
-            pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0x36d326eed40efeb2 : 0x0ef68ec68504005e);
+            pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x5be9ce18223c636a : 0x48b6bf93a2789640); // md5 "octave_-10" or "octave_-8"
             U_initPerlin(&octaves[31], &pxr2);
 		}
 		*climateSample += 100./279 * samplePerlin(&octaves[31], *px/(256*LB_MULT)*OFF, 0, *pz/(256*LB_MULT)*OFF, 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[3]) || (upperBounds && *climateSample > upperBounds[3])) return 3;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0x0ef68ec68504005e : 0xe51c98ce7d1de664);
-            pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x48b6bf93a2789640 : 0x5f9478a733040c45); // md5 "octave_-8" or "octave_-6"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0x0ef68ec68504005e : 0xe51c98ce7d1de664);
+            pxr2.hi = xhi ^ (largeBiomesFlag ? 0x48b6bf93a2789640 : 0x5f9478a733040c45); // md5 "octave_-8" or "octave_-6"
             U_initPerlin(&octaves[28], &pxr2);
 		}
 		*climateSample += 25./279 * samplePerlin(&octaves[28], *px/(64*LB_MULT), 0, *pz/(64*LB_MULT), 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[4]) || (upperBounds && *climateSample > upperBounds[4])) return 4;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0x0ef68ec68504005e : 0xe51c98ce7d1de664);
-            pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x48b6bf93a2789640 : 0x5f9478a733040c45); // md5 "octave_-8" or "octave_-6"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0x0ef68ec68504005e : 0xe51c98ce7d1de664);
+            pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x48b6bf93a2789640 : 0x5f9478a733040c45); // md5 "octave_-8" or "octave_-6"
             U_initPerlin(&octaves[32], &pxr2);
 		}
 		*climateSample += 25./279 * samplePerlin(&octaves[32], *px/(64*LB_MULT)*OFF, 0, *pz/(64*LB_MULT)*OFF, 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[5]) || (upperBounds && *climateSample > upperBounds[5])) return 5;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo ^ (LARGE_BIOMES_FLAG ? 0xf11268128982754f : 0x6d7b49e7e429850a);
-            pxr2.hi = xhi ^ (LARGE_BIOMES_FLAG ? 0x257a1d670430b0aa : 0x2e3063c622a24777); // md5 "octave_-7" or "octave_-5"
+			pxr2.lo = xlo ^ (largeBiomesFlag ? 0xf11268128982754f : 0x6d7b49e7e429850a);
+            pxr2.hi = xhi ^ (largeBiomesFlag ? 0x257a1d670430b0aa : 0x2e3063c622a24777); // md5 "octave_-7" or "octave_-5"
             U_initPerlin(&octaves[29], &pxr2);
 		}
 		*climateSample += 25./558 * samplePerlin(&octaves[29], *px/(32*LB_MULT), 0, *pz/(32*LB_MULT), 0, 0);
         if ((lowerBounds && *climateSample < lowerBounds[6]) || (upperBounds && *climateSample > upperBounds[6])) return 6;
 
 		if (seedIfInitializingClimate) {
-			pxr2.lo = xlo2 ^ (LARGE_BIOMES_FLAG ? 0xf11268128982754f : 0x6d7b49e7e429850a);
-            pxr2.hi = xhi2 ^ (LARGE_BIOMES_FLAG ? 0x257a1d670430b0aa : 0x2e3063c622a24777); // md5 "octave_-7" or "octave_-5"
+			pxr2.lo = xlo2 ^ (largeBiomesFlag ? 0xf11268128982754f : 0x6d7b49e7e429850a);
+            pxr2.hi = xhi2 ^ (largeBiomesFlag ? 0x257a1d670430b0aa : 0x2e3063c622a24777); // md5 "octave_-7" or "octave_-5"
             U_initPerlin(&octaves[33], &pxr2);
 		}
 		*climateSample += 25./558 * samplePerlin(&octaves[33], *px/(32*LB_MULT)*OFF, 0, *pz/(32*LB_MULT)*OFF, 0, 0);
