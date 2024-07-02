@@ -18,12 +18,12 @@ bool U_getFitnessBounded(const Pos *coord, const double *temperature, const doub
 
 // Samples each climate to return the fitness of a point.
 // All climates must have been initialized beforehand (with e.g. `U_initAllClimates()`.)
-double U_sampleAndGetFitness(const Pos *coord, PerlinNoise *oct);
+double U_sampleAndGetFitness(const Pos *coord, PerlinNoise *oct, const bool largeBiomesFlag);
 
 // Samples each climate to calculate the fitness of a point, aborting early (and returning false) if the fitness ever rises above `*upperBound`.
 // Otherwise returns true and stores the fitness value in `*fitness`.
 // All climates must have been initialized beforehand (with e.g. `U_initAllClimates()`.)
-bool U_sampleAndGetFitnessBounded(const Pos *coord, PerlinNoise *oct, const double *upperBound, double *fitness);
+bool U_sampleAndGetFitnessBounded(const Pos *coord, PerlinNoise *oct, const double *upperBound, const bool largeBiomesFlag, double *fitness);
 
 // Returns the Euclidean distance that would equate to the provided fitness value.
 double U_getEffectiveDistance(const double fitness);
@@ -54,15 +54,15 @@ double U_getEffectiveWeirdnessInner(const double fitness);
 
 // Emulates the first stage of the spawn algorithm, aborting early (and returning false) if the current chosen point's fitness ever drops below `fitnessLowerBound`.
 // Otherwise returns true and stores the chosen coordinate index in `*chosenCoordIndex` fitness value in `*fitness`.
-bool U_firstStageSpawnBounded(PerlinNoise *oct, const double fitnessLowerBound, int *chosenCoordIndex, double *chosenFitness);
+bool U_firstStageSpawnBounded(PerlinNoise *oct, const double fitnessLowerBound, int *chosenCoordIndex, double *chosenFitness, const bool largeBiomesFlag);
 
 // `U_firstStageSpawnBounded()`, but derives the coordinates manually instead of using a lookup table. For environments with limited memory.
-bool U_firstStageSpawnBounded_noTable(PerlinNoise *oct, const double fitnessLowerBound, Pos *chosenCoord, double *chosenFitness);
+bool U_firstStageSpawnBounded_noTable(PerlinNoise *oct, const double fitnessLowerBound, Pos *chosenCoord, const bool largeBiomesFlag, double *chosenFitness);
 
 // Emulates the second stage of the spawn algorithm, aborting early (and returning false) if the current chosen point's fitness ever drops below `fitnessLowerBound`.
 // Otherwise returns true and stores the chosen coordinate index fitness value in `*fitness`.
-bool U_secondStageSpawnBounded(PerlinNoise *oct, const int firstStageChosenCoordIndex, const double firstStageChosenFitness, const double fitnessLowerBound, int *chosenCoordIndex, double *chosenFitness);
+bool U_secondStageSpawnBounded(PerlinNoise *oct, const int firstStageChosenCoordIndex, const double firstStageChosenFitness, const double fitnessLowerBound, int *chosenCoordIndex, const bool largeBiomesFlag, double *chosenFitness);
 
 // `U_secondStageSpawnBounded()`, but derives the coordinates manually instead of using a lookup table. For environments with limited memory.
-bool U_secondStageSpawnBounded_noTable(PerlinNoise *oct, const Pos *firstStageChosenCoord, const double firstStageChosenFitness, const double fitnessLowerBound, Pos *chosenCoord, double *chosenFitness);
+bool U_secondStageSpawnBounded_noTable(PerlinNoise *oct, const Pos *firstStageChosenCoord, const double firstStageChosenFitness, const double fitnessLowerBound, Pos *chosenCoord, const bool largeBiomesFlag, double *chosenFitness);
 #endif
