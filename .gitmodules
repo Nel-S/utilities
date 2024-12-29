@@ -1,3 +1,6 @@
 [submodule "cubiomes"]
 	path = cubiomes
 	url = https://github.com/Cubitect/cubiomes
+[submodule "core"]
+	path = core
+	url = https://github.com/nel-s/core
