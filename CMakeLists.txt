@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.5)
+
+if (TARGET utilities)
+	return()
+endif()
+
 project(utilities)
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -23,7 +28,9 @@ set(SOURCES
 	U_Math.c
 )
 
-add_subdirectory(cubiomes)
+if (NOT TARGET cubiomes)
+	add_subdirectory(cubiomes)
+endif()
 
 add_library(utilitiesObjects OBJECT ${SOURCES})
 set_property(TARGET utilitiesObjects PROPERTY POSITION_INDEPENDENT_CODE 1)
